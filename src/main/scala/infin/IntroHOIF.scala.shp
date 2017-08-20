@@ -1,0 +1,58 @@
+package infin
+
+import cats._
+import cats.data._
+import cats.implicits._
+
+import shapeless.{ HList, ::, HNil }
+import shapeless.HList.ListCompat._
+
+object IntroHOIF {
+
+  // The initial encoding
+  // class Env[H <: HList](hs: H)
+
+  sealed trait Var[+Env, T]
+  case class VZ[Env, T]() extends Var[Env, T]
+  case class VS[Env, T](v: Var[Env, T]) extends Var[Env, T]
+
+  sealed trait Exp[Env, T]
+  case class B[Env](b: Boolean) extends Exp[Env, Boolean]
+  case class V[Env, T](v: Var[Env, T]) extends Exp[Env, T]
+  case class L[Env, X, Y](t: Exp[(X, Env), Y]) extends Exp[Env, X => Y]
+  case class A[Env, X, Y](e1: Exp[Env, X => Y], e2: Exp[Env, X]) extends Exp[Env, Y]
+
+  def lookup[Env <: HList, T](v: Var[Env, T], e: Env): T = (v, e) match {
+    case (VZ(), x #: _) => x.asInstanceOf[T]
+    case (VS(v), _ #: env) => lookup(v, env)
+    case (VS(_), _) => ???
+    case (VZ(), _) => ???
+  }
+
+  def eval[Env <: HList, T](env: Env, exp: Exp[Env, T]): T = exp match {
+    case V(v) => lookup(v, env)
+    case B(b) => b
+    case L(e) => { x => eval[Env, T](x #: env, e) }
+    case A(e1, e2) => eval(env, e1)(eval(env, e2))
+  }
+}
+
+/*
+import shapeless._, nat._, ops.hlist._
+import shapeless._
+import nat._
+import ops.hlist._
+
+class Container[L <: HList](val hl: L) {
+  def get(n: Nat)(implicit at: At[L, n.N]): at.Out = hl[n.N]
+}
+
+scala> val container = new Container(1 :: "foo" :: HNil)
+container: Container[shapeless.::[Int,shapeless.::[String,shapeless.HNil]]] = ...
+
+scala> container.get(_0)
+res1: Int = 1
+*/
+
+
+
